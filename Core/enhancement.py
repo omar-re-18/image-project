@@ -1,33 +1,26 @@
 import numpy as np
 
 # ==========================================
-# 1. Brightness Adjustment (Manual)
+# 1. Brightness Adjustment (Vectorized)
 # ==========================================
 
 def adjust_brightness(img, value):
     """
-    Increase or decrease image brightness
+    Increase or decrease image brightness (vectorized)
     value: positive → brighter
            negative → darker
     """
-    result = img.astype(np.int16)
-
-    h, w = result.shape[:2]
-
-    for i in range(h):
-        for j in range(w):
-            result[i, j] += value
-
+    result = img.astype(np.int16) + value
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # ==========================================
-# 2. Contrast Stretching
+# 2. Contrast Stretching (Vectorized)
 # ==========================================
 
 def contrast_stretch(img):
     """
-    Expands intensity range from min-max → 0-255
+    Expands intensity range from min-max → 0-255 (vectorized)
     """
 
     min_val = np.min(img)
@@ -37,37 +30,25 @@ def contrast_stretch(img):
     if min_val == max_val:
         return np.full_like(img, 128, dtype=np.uint8)
 
-    h, w = img.shape
-    result = np.zeros((h, w), dtype=np.uint8)
-
-    for i in range(h):
-        for j in range(w):
-
-            result[i, j] = int(((img[i, j] - min_val) * 255) / (max_val - min_val))
+    # Vectorized operation: much faster
+    result = ((img.astype(np.float32) - min_val) * 255 / (max_val - min_val)).astype(np.uint8)
 
     return result
 
 
 # ==========================================
-# 3. Gamma Correction (Manual)
+# 3. Gamma Correction (Vectorized)
 # ==========================================
 
 def gamma_correction(img, gamma=1.0):
     """
-    Non-linear brightness adjustment
+    Non-linear brightness adjustment (vectorized)
     """
 
     img = img / 255.0
 
-    h, w = img.shape
-    result = np.zeros((h, w), dtype=np.float32)
-
-    for i in range(h):
-        for j in range(w):
-
-            result[i, j] = img[i, j] ** gamma
-
-    result = (result * 255)
+    # Vectorized: much faster than nested loops
+    result = np.power(img, gamma) * 255
 
     return np.clip(result, 0, 255).astype(np.uint8)
 

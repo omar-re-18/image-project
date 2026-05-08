@@ -53,21 +53,15 @@ def auto_scan(image):
 
 
 # ==========================================
-# Simple Threshold (kept local for clarity)
+# Simple Threshold (Vectorized)
 # ==========================================
 
 def simple_threshold(img, threshold=127):
+    """
+    Binarize image using threshold (vectorized)
+    """
 
-    h, w = img.shape
-    result = np.zeros((h, w), dtype=np.uint8)
-
-    for i in range(h):
-        for j in range(w):
-
-            if img[i, j] > threshold:
-                result[i, j] = 255
-            else:
-                result[i, j] = 0
+    result = np.where(img > threshold, 255, 0).astype(np.uint8)
 
     return result
 

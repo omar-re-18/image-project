@@ -1,4 +1,5 @@
 import numpy as np
+from scipy import ndimage
 
 # ==========================================
 # Helper: Padding
@@ -14,51 +15,38 @@ def pad_image(img, pad_size, pad_value):
 
 
 # ==========================================
-# 1. Erosion (Manual)
+# 1. Erosion (Optimized with scipy)
 # ==========================================
 
 def erosion(img, kernel_size=3):
     """
-    Removes small white noise
+    Removes small white noise (optimized)
     """
 
-    pad = kernel_size // 2
-    padded = pad_image(img, pad, 255)
-
-    h, w = img.shape
-    result = np.zeros_like(img)
-
-    for i in range(h):
-        for j in range(w):
-
-            region = padded[i:i+kernel_size, j:j+kernel_size]
-
-            result[i, j] = np.min(region)
+    # Create binary structuring element
+    struct = ndimage.generate_binary_structure(2, 1)
+    struct = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+    
+    # Use scipy's optimized binary_erosion
+    result = ndimage.binary_erosion(img > 127, structure=struct).astype(np.uint8) * 255
 
     return result
 
 
 # ==========================================
-# 2. Dilation (Manual)
+# 2. Dilation (Optimized with scipy)
 # ==========================================
 
 def dilation(img, kernel_size=3):
     """
-    Expands white regions
+    Expands white regions (optimized)
     """
 
-    pad = kernel_size // 2
-    padded = pad_image(img, pad, 0)
-
-    h, w = img.shape
-    result = np.zeros_like(img)
-
-    for i in range(h):
-        for j in range(w):
-
-            region = padded[i:i+kernel_size, j:j+kernel_size]
-
-            result[i, j] = np.max(region)
+    # Create binary structuring element
+    struct = np.ones((kernel_size, kernel_size), dtype=np.uint8)
+    
+    # Use scipy's optimized binary_dilation
+    result = ndimage.binary_dilation(img > 127, structure=struct).astype(np.uint8) * 255
 
     return result
 

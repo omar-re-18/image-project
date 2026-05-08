@@ -1,26 +1,20 @@
 import numpy as np
 
 # ==========================================
-# 1. Convert to Grayscale (Manual fallback)
+# 1. Convert to Grayscale (Vectorized)
 # ==========================================
 
 def to_grayscale(img):
     """
-    Convert RGB image to grayscale using luminance formula
+    Convert RGB image to grayscale using luminance formula (vectorized)
     """
 
     if len(img.shape) == 2:
         return img  # already grayscale
 
-    h, w, _ = img.shape
-    gray = np.zeros((h, w), dtype=np.uint8)
-
-    for i in range(h):
-        for j in range(w):
-            r, g, b = img[i, j]
-
-            gray[i, j] = int(0.299*r + 0.587*g + 0.114*b)
-
+    # Vectorized: much faster than nested loops
+    gray = (0.299 * img[:,:,2] + 0.587 * img[:,:,1] + 0.114 * img[:,:,0]).astype(np.uint8)
+    
     return gray
 
 
@@ -69,29 +63,19 @@ def normalize(img):
 
 
 # ==========================================
-# 4. Noise Reduction (Box Filter)
+# 4. Noise Reduction (Vectorized)
 # ==========================================
 
 def remove_noise(img, kernel_size=3):
     """
-    Simple averaging filter to reduce noise
+    Simple averaging filter to reduce noise (vectorized with scipy)
     """
+    from scipy.ndimage import uniform_filter
 
-    pad = kernel_size // 2
-
-    padded = np.pad(img, pad, mode='edge')
-
-    h, w = img.shape
-    result = np.zeros_like(img)
-
-    for i in range(h):
-        for j in range(w):
-
-            region = padded[i:i+kernel_size, j:j+kernel_size]
-
-            result[i, j] = np.mean(region)
-
-    return result.astype(np.uint8)
+    # Use scipy's optimized uniform filter instead of nested loops
+    result = uniform_filter(img.astype(np.float32), size=kernel_size)
+    
+    return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # ==========================================

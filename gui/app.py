@@ -1,172 +1,689 @@
-import tkinter as tk
+import os
+from pathlib import Path
+import customtkinter as ctk
 from tkinter import filedialog, messagebox
-from PIL import Image, ImageTk
+from PIL import Image
 import cv2
-import numpy as np
 
-# Core modules
-from core.scanner_pipeline import auto_scan, debug_pipeline
+# ==========================================
+# Core Modules
+# ==========================================
+
+from core.scanner_pipeline import auto_scan
 from core.preprocessing import to_grayscale
-from core.enhancement import contrast_stretch, adjust_brightness
+from core.enhancement import contrast_stretch
 from core.morphology import opening, closing
 
+# ==========================================
 # Tools
+# ==========================================
+
 from tools.negative import negative
 from tools.solarization import solarize
 from tools.dithering import floyd_steinberg_dithering
 from tools.rgb_channels import channel_grid
 
-
 # ==========================================
-# Global State
-# ==========================================
-
-original_image = None
-current_image = None
-
-
-# ==========================================
-# Load Image
+# Utils
 # ==========================================
 
-def upload_image():
-    global original_image, current_image
-
-    path = filedialog.askopenfilename()
-
-    if not path:
-        return
-
-    img = cv2.imread(path)
-
-    if img is None:
-        messagebox.showerror("Error", "Invalid image file")
-        return
-
-    original_image = img
-    current_image = img
-
-    show_image(current_image, original_label)
+from utils.image_io import load_image
+from utils.display import prepare_image
 
 
 # ==========================================
-# Display Image Helper
+# Theme Configuration
 # ==========================================
 
-def show_image(img, label):
-    img = cv2.resize(img, (400, 400))
-    
-    if len(img.shape) == 2:
-        img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
-    else:
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    
-    # Convert from BGR (OpenCV) to RGB (PIL)
-    pil_img = Image.fromarray(img)
-    photo = ImageTk.PhotoImage(pil_img)
-    
-    label.configure(image=photo)
-    label.image = photo
+ctk.set_appearance_mode("dark")
+ctk.set_default_color_theme("blue")
 
 
 # ==========================================
-# Auto Scan
+# Main Application
 # ==========================================
 
-def run_auto_scan():
-    global current_image
+class SmartScannerApp(ctk.CTk):
 
-    if original_image is None:
-        return
+    def __init__(self):
 
-    current_image = auto_scan(original_image)
-    show_image(current_image, processed_label)
+        super().__init__()
+
+        # ==================================
+        # Window Setup
+        # ==================================
+
+        self.title("Smart Document Scanner")
+
+        self.geometry("1450x850")
+
+        self.minsize(1300, 750)
+
+        self.configure(fg_color="#1a1a1a")
+
+        # ==================================
+        # Image State
+        # ==================================
+
+        self.original_image = None
+        self.current_image = None
+
+        # ==================================
+        # Icons Cache
+        # ==================================
+
+        self.icons = {}
+
+        # ==================================
+        # Build UI
+        # ==================================
+
+        self.build_ui()
+
+    # ======================================
+    # Load Icon
+    # ======================================
+
+    def load_icon(self, filename, size=(24, 24)):
+
+        # Get the project root by going up from gui directory
+        gui_dir = Path(__file__).parent
+        project_root = gui_dir.parent
+        icon_path = project_root / "assets" / "icons" / filename
+
+        # Handle missing icon file
+        if not icon_path.exists():
+            # Create a placeholder image if icon doesn't exist
+            placeholder = Image.new("RGB", size, color=(100, 100, 100))
+            return ctk.CTkImage(
+                light_image=placeholder,
+                dark_image=placeholder,
+                size=size
+            )
+
+        image = Image.open(icon_path)
+
+        return ctk.CTkImage(
+            light_image=image,
+            dark_image=image,
+            size=size
+        )
+
+    # ======================================
+    # Build UI
+    # ======================================
+
+    def build_ui(self):
+
+        # ==================================
+        # Sidebar
+        # ==================================
+
+        self.sidebar = ctk.CTkFrame(
+            self,
+            width=260,
+            corner_radius=0,
+            fg_color="#202020"
+        )
+
+        self.sidebar.pack(
+            side="left",
+            fill="y"
+        )
+
+        # ==================================
+        # Logo / Title
+        # ==================================
+
+        self.logo = ctk.CTkLabel(
+            self.sidebar,
+            text="SMART\nSCANNER",
+            font=("Arial", 30, "bold"),
+            text_color="#00d9ff"
+        )
+
+        self.logo.pack(
+            pady=(35, 25)
+        )
+
+        # ==================================
+        # Buttons
+        # ==================================
+
+        self.create_sidebar_button(
+            "Upload Image",
+            "upload.png",
+            self.upload_image
+        )
+
+        self.create_sidebar_button(
+            "Auto Scan",
+            "scan.png",
+            self.run_auto_scan
+        )
+
+        self.create_sidebar_button(
+            "Negative",
+            "negative.png",
+            self.apply_negative
+        )
+
+        self.create_sidebar_button(
+            "Solarization",
+            "solarize.png",
+            self.apply_solarization
+        )
+
+        self.create_sidebar_button(
+            "Dithering",
+            "dithering.png",
+            self.apply_dithering
+        )
+
+        self.create_sidebar_button(
+            "Contrast",
+            "contrast.png",
+            self.apply_contrast
+        )
+
+        self.create_sidebar_button(
+            "Opening",
+            "opening.png",
+            self.apply_opening
+        )
+
+        self.create_sidebar_button(
+            "Closing",
+            "closing.png",
+            self.apply_closing
+        )
+
+        self.create_sidebar_button(
+            "RGB Channels",
+            "rgb.png",
+            self.show_rgb
+        )
+
+        self.create_sidebar_button(
+            "Reset",
+            "reset.png",
+            self.reset_image
+        )
+
+        # ==================================
+        # Main Area
+        # ==================================
+
+        self.main_area = ctk.CTkFrame(
+            self,
+            fg_color="#1a1a1a"
+        )
+
+        self.main_area.pack(
+            side="right",
+            fill="both",
+            expand=True,
+            padx=15,
+            pady=15
+        )
+
+        # ==================================
+        # Status Bar
+        # ==================================
+
+        self.status = ctk.CTkLabel(
+            self.main_area,
+            text="Ready",
+            height=40,
+            anchor="w",
+            corner_radius=10,
+            fg_color="#2a2a2a",
+            font=("Arial", 14)
+        )
+
+        self.status.pack(
+            fill="x",
+            pady=(0, 15)
+        )
+
+        # ==================================
+        # Images Area
+        # ==================================
+
+        self.images_frame = ctk.CTkFrame(
+            self.main_area,
+            fg_color="transparent"
+        )
+
+        self.images_frame.pack(
+            fill="both",
+            expand=True
+        )
+
+        # ==================================
+        # Original Image Panel
+        # ==================================
+
+        self.original_panel = self.create_image_panel(
+            self.images_frame,
+            "Original Image"
+        )
+
+        self.original_panel.pack(
+            side="left",
+            fill="both",
+            expand=True,
+            padx=10
+        )
+
+        self.original_label = ctk.CTkLabel(
+            self.original_panel,
+            text=""
+        )
+
+        self.original_label.pack(
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+        # ==================================
+        # Processed Image Panel
+        # ==================================
+
+        self.processed_panel = self.create_image_panel(
+            self.images_frame,
+            "Processed Image"
+        )
+
+        self.processed_panel.pack(
+            side="right",
+            fill="both",
+            expand=True,
+            padx=10
+        )
+
+        self.processed_label = ctk.CTkLabel(
+            self.processed_panel,
+            text=""
+        )
+
+        self.processed_label.pack(
+            expand=True,
+            padx=10,
+            pady=10
+        )
+
+    # ======================================
+    # Sidebar Button
+    # ======================================
+
+    def create_sidebar_button(
+        self,
+        text,
+        icon_name,
+        command
+    ):
+
+        icon = self.load_icon(icon_name)
+
+        button = ctk.CTkButton(
+            self.sidebar,
+            text=text,
+            image=icon,
+            command=command,
+            height=48,
+            corner_radius=12,
+            anchor="w",
+            font=("Arial", 14, "bold"),
+            fg_color="#2d2d2d",
+            hover_color="#3b3b3b"
+        )
+
+        button.pack(
+            fill="x",
+            padx=18,
+            pady=6
+        )
+
+    # ======================================
+    # Image Panel
+    # ======================================
+
+    def create_image_panel(self, parent, title):
+
+        panel = ctk.CTkFrame(
+            parent,
+            corner_radius=18,
+            fg_color="#232323"
+        )
+
+        label = ctk.CTkLabel(
+            panel,
+            text=title,
+            font=("Arial", 20, "bold"),
+            text_color="white"
+        )
+
+        label.pack(
+            pady=(15, 5)
+        )
+
+        return panel
+
+    # ======================================
+    # Upload Image
+    # ======================================
+
+    def upload_image(self):
+
+        path = filedialog.askopenfilename(
+            filetypes=[
+                (
+                    "Images",
+                    "*.png *.jpg *.jpeg *.bmp"
+                )
+            ]
+        )
+
+        if not path:
+            return
+
+        try:
+
+            self.original_image = load_image(path)
+
+            self.current_image = self.original_image.copy()
+
+            self.display_image(
+                self.original_image,
+                self.original_label
+            )
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Image uploaded successfully"
+            )
+
+        except Exception as e:
+
+            messagebox.showerror(
+                "Error",
+                str(e)
+            )
+
+    # ======================================
+    # Display Image
+    # ======================================
+
+    def display_image(self, img, label):
+
+        img = prepare_image(
+            img,
+            size=(520, 520)
+        )
+
+        image = Image.fromarray(img)
+
+        ctk_image = ctk.CTkImage(
+            light_image=image,
+            dark_image=image,
+            size=(520, 520)
+        )
+
+        label.configure(
+            image=ctk_image,
+            text=""
+        )
+
+        label.image = ctk_image
+
+    # ======================================
+    # Update Status
+    # ======================================
+
+    def update_status(self, text):
+
+        self.status.configure(
+            text=f"  {text}"
+        )
+
+    # ======================================
+    # Processing Operations
+    # ======================================
+
+    def run_auto_scan(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            self.current_image = auto_scan(
+                self.original_image
+            )
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Auto scan completed"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_negative(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = negative(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Negative effect applied"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_solarization(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = solarize(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Solarization applied"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_dithering(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = floyd_steinberg_dithering(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Dithering completed"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_contrast(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = contrast_stretch(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Contrast enhanced"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_opening(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = opening(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Opening applied"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def apply_closing(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            gray = to_grayscale(
+                self.original_image
+            )
+
+            self.current_image = closing(gray)
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Closing applied"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    def show_rgb(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            self.current_image = channel_grid(
+                self.original_image
+            )
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "RGB channels visualized"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
+
+    # ======================================
+    # Reset
+    # ======================================
+
+    def reset_image(self):
+
+        if self.original_image is None:
+            messagebox.showwarning("Warning", "Please upload an image first")
+            return
+
+        try:
+            self.current_image = self.original_image.copy()
+
+            self.display_image(
+                self.current_image,
+                self.processed_label
+            )
+
+            self.update_status(
+                "Image reset"
+            )
+        except Exception as e:
+            messagebox.showerror("Error", str(e))
 
 
 # ==========================================
-# Manual Tools
-# ==========================================
-
-def apply_negative():
-    global current_image
-    current_image = negative(to_grayscale(original_image))
-    show_image(current_image, processed_label)
-
-
-def apply_solarization():
-    global current_image
-    current_image = solarize(to_grayscale(original_image))
-    show_image(current_image, processed_label)
-
-
-def apply_dithering():
-    global current_image
-    gray = to_grayscale(original_image)
-    current_image = floyd_steinberg_dithering(gray)
-    show_image(current_image, processed_label)
-
-
-def apply_contrast():
-    global current_image
-    gray = to_grayscale(original_image)
-    current_image = contrast_stretch(gray)
-    show_image(current_image, processed_label)
-
-
-def apply_opening():
-    global current_image
-    gray = to_grayscale(original_image)
-    current_image = opening(gray)
-    show_image(current_image, processed_label)
-
-
-def apply_closing():
-    global current_image
-    gray = to_grayscale(original_image)
-    current_image = closing(gray)
-    show_image(current_image, processed_label)
-
-
-def show_rgb():
-    global current_image
-    current_image = channel_grid(original_image)
-    show_image(current_image, processed_label)
-
-
-# ==========================================
-# GUI Setup
+# Run Application
 # ==========================================
 
 def run_app():
-    global root, original_label, processed_label
 
-    root = tk.Tk()
-    root.title("Smart Document Scanner")
-    root.geometry("1000x600")
-    root.configure(bg="black")
+    app = SmartScannerApp()
 
-    # Buttons Frame
-    frame = tk.Frame(root, bg="gray")
-    frame.pack(side=tk.TOP, fill=tk.X)
+    app.mainloop()
 
-    tk.Button(frame, text="Upload", command=upload_image).pack(side=tk.LEFT)
-    tk.Button(frame, text="Auto Scan", command=run_auto_scan).pack(side=tk.LEFT)
-    tk.Button(frame, text="Negative", command=apply_negative).pack(side=tk.LEFT)
-    tk.Button(frame, text="Solarization", command=apply_solarization).pack(side=tk.LEFT)
-    tk.Button(frame, text="Dithering", command=apply_dithering).pack(side=tk.LEFT)
-    tk.Button(frame, text="Contrast", command=apply_contrast).pack(side=tk.LEFT)
-    tk.Button(frame, text="Opening", command=apply_opening).pack(side=tk.LEFT)
-    tk.Button(frame, text="Closing", command=apply_closing).pack(side=tk.LEFT)
-    tk.Button(frame, text="RGB View", command=show_rgb).pack(side=tk.LEFT)
 
-    # Image Display Area
-    display_frame = tk.Frame(root, bg="black")
-    display_frame.pack()
+# ==========================================
+# Main
+# ==========================================
 
-    original_label = tk.Label(display_frame, text="Original Image", bg="black")
-    original_label.pack(side=tk.LEFT, padx=20)
+if __name__ == "__main__":
 
-    processed_label = tk.Label(display_frame, text="Processed Image", bg="black")
-    processed_label.pack(side=tk.RIGHT, padx=20)
-
-    root.mainloop()
+    run_app()
