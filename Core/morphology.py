@@ -1,0 +1,142 @@
+import numpy as np
+
+# ==========================================
+# Helper: Padding
+# ==========================================
+
+def pad_image(img, pad_size, pad_value):
+    return np.pad(
+        img,
+        pad_size,
+        mode='constant',
+        constant_values=pad_value
+    )
+
+
+# ==========================================
+# 1. Erosion (Manual)
+# ==========================================
+
+def erosion(img, kernel_size=3):
+    """
+    Removes small white noise
+    """
+
+    pad = kernel_size // 2
+    padded = pad_image(img, pad, 255)
+
+    h, w = img.shape
+    result = np.zeros_like(img)
+
+    for i in range(h):
+        for j in range(w):
+
+            region = padded[i:i+kernel_size, j:j+kernel_size]
+
+            result[i, j] = np.min(region)
+
+    return result
+
+
+# ==========================================
+# 2. Dilation (Manual)
+# ==========================================
+
+def dilation(img, kernel_size=3):
+    """
+    Expands white regions
+    """
+
+    pad = kernel_size // 2
+    padded = pad_image(img, pad, 0)
+
+    h, w = img.shape
+    result = np.zeros_like(img)
+
+    for i in range(h):
+        for j in range(w):
+
+            region = padded[i:i+kernel_size, j:j+kernel_size]
+
+            result[i, j] = np.max(region)
+
+    return result
+
+
+# ==========================================
+# 3. Opening (Erosion → Dilation)
+# ==========================================
+
+def opening(img, kernel_size=3):
+    """
+    Removes noise (small objects)
+    """
+
+    eroded = erosion(img, kernel_size)
+    opened = dilation(eroded, kernel_size)
+
+    return opened
+
+
+# ==========================================
+# 4. Closing (Dilation → Erosion)
+# ==========================================
+
+def closing(img, kernel_size=3):
+    """
+    Fills small holes
+    """
+
+    dilated = dilation(img, kernel_size)
+    closed = erosion(dilated, kernel_size)
+
+    return closed
+
+
+# ==========================================
+# 5. Morphological Gradient
+# ==========================================
+
+def morphological_gradient(img, kernel_size=3):
+    """
+    Highlights edges (Dilation - Erosion)
+    """
+
+    dilated = dilation(img, kernel_size)
+    eroded = erosion(img, kernel_size)
+
+    result = dilated.astype(np.int16) - eroded.astype(np.int16)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+# ==========================================
+# 6. Top Hat Transformation
+# ==========================================
+
+def top_hat(img, kernel_size=3):
+    """
+    Extracts small bright objects
+    """
+
+    opened = opening(img, kernel_size)
+
+    result = img.astype(np.int16) - opened.astype(np.int16)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
+
+
+# ==========================================
+# 7. Black Hat Transformation
+# ==========================================
+
+def black_hat(img, kernel_size=3):
+    """
+    Extracts small dark objects
+    """
+
+    closed = closing(img, kernel_size)
+
+    result = closed.astype(np.int16) - img.astype(np.int16)
+
+    return np.clip(result, 0, 255).astype(np.uint8)
