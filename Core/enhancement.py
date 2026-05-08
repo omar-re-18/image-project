@@ -33,13 +33,17 @@ def contrast_stretch(img):
     min_val = np.min(img)
     max_val = np.max(img)
 
+    # Handle uniform image (all same values)
+    if min_val == max_val:
+        return np.full_like(img, 128, dtype=np.uint8)
+
     h, w = img.shape
     result = np.zeros((h, w), dtype=np.uint8)
 
     for i in range(h):
         for j in range(w):
 
-            result[i, j] = ((img[i, j] - min_val) * 255) // (max_val - min_val + 1)
+            result[i, j] = int(((img[i, j] - min_val) * 255) / (max_val - min_val))
 
     return result
 

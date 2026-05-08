@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox
+from PIL import Image, ImageTk
 import cv2
 import numpy as np
 
@@ -54,16 +55,18 @@ def upload_image():
 
 def show_image(img, label):
     img = cv2.resize(img, (400, 400))
-
+    
     if len(img.shape) == 2:
         img = cv2.cvtColor(img, cv2.COLOR_GRAY2RGB)
     else:
         img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
-    img = tk.PhotoImage(master=root, data=cv2.imencode('.png', img)[1].tobytes())
-
-    label.configure(image=img)
-    label.image = img
+    
+    # Convert from BGR (OpenCV) to RGB (PIL)
+    pil_img = Image.fromarray(img)
+    photo = ImageTk.PhotoImage(pil_img)
+    
+    label.configure(image=photo)
+    label.image = photo
 
 
 # ==========================================

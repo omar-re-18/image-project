@@ -5,6 +5,10 @@ import numpy as np
 # ==========================================
 
 def to_grayscale(img):
+    # Check if already grayscale
+    if len(img.shape) == 2:
+        return img
+    
     h, w, c = img.shape
     gray = np.zeros((h, w), dtype=np.uint8)
 

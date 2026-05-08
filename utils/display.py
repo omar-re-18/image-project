@@ -111,6 +111,12 @@ def grid_view(images):
             img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
         processed.append(img)
 
+    # Ensure we have at least 4 images for 2x2 grid
+    while len(processed) < 4:
+        # Pad with blank images if needed
+        h, w = processed[0].shape[:2]
+        processed.append(np.zeros((h, w, 3), dtype=np.uint8))
+
     row1 = np.hstack(processed[:2])
     row2 = np.hstack(processed[2:4])
 
