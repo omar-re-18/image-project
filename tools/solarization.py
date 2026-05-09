@@ -32,22 +32,6 @@ def solarize(img, threshold=128):
 
     return result.astype(np.uint8)
 
-
-# ==========================================
-# Adaptive Solarization (Advanced version)
-# ==========================================
-
-def adaptive_solarize(img):
-    """
-    Automatically chooses threshold based on mean intensity
-    """
-
-    if len(img.shape) == 2:
-        threshold = np.mean(img)
-    else:
-        gray = np.mean(img, axis=2)
-        threshold = np.mean(gray)
-
     return solarize(img, threshold=int(threshold))
 
 

@@ -19,30 +19,6 @@ def to_grayscale(img):
 
 
 # ==========================================
-# 2. Resize Image (Manual nearest neighbor)
-# ==========================================
-
-def resize(img, new_h, new_w):
-    """
-    Resize image using nearest neighbor interpolation
-    """
-
-    h, w = img.shape[:2]
-
-    result = np.zeros((new_h, new_w), dtype=img.dtype)
-
-    for i in range(new_h):
-        for j in range(new_w):
-
-            src_i = int(i * h / new_h)
-            src_j = int(j * w / new_w)
-
-            result[i, j] = img[src_i, src_j]
-
-    return result
-
-
-# ==========================================
 # 3. Normalize Image
 # ==========================================
 
@@ -57,9 +33,11 @@ def normalize(img):
     if max_val == min_val:
         return img.copy()
 
-    result = (img - min_val) * 255 / (max_val - min_val)
+    # Convert to float32 to avoid overflow during calculation
+    img_float = img.astype(np.float32)
+    result = (img_float - min_val) * 255 / (max_val - min_val)
 
-    return result.astype(np.uint8)
+    return np.clip(result, 0, 255).astype(np.uint8)
 
 
 # ==========================================
@@ -78,41 +56,3 @@ def remove_noise(img, kernel_size=3):
     return np.clip(result, 0, 255).astype(np.uint8)
 
 
-# ==========================================
-# 5. Invert Intensity Range (Pre-step enhancement)
-# ==========================================
-
-def invert(img):
-    """
-    Invert image intensity
-    """
-
-    h, w = img.shape
-    result = np.zeros((h, w), dtype=np.uint8)
-
-    for i in range(h):
-        for j in range(w):
-
-            result[i, j] = 255 - img[i, j]
-
-    return result
-
-
-# ==========================================
-# 6. Crop Center (Useful for document detection)
-# ==========================================
-
-def center_crop(img, crop_ratio=0.8):
-    """
-    Crop center region of image
-    """
-
-    h, w = img.shape[:2]
-
-    new_h = int(h * crop_ratio)
-    new_w = int(w * crop_ratio)
-
-    start_i = (h - new_h) // 2
-    start_j = (w - new_w) // 2
-
-    return img[start_i:start_i+new_h, start_j:start_j+new_w]

@@ -7,7 +7,7 @@ from core.morphology import opening, closing
 
 from tools.negative import negative
 from tools.solarization import solarize
-from tools.dithering import floyd_steinberg_dithering
+from tools.dithering import dither_image
 from tools.rgb_channels import channel_grid
 
 
@@ -82,7 +82,8 @@ class EventHandler:
             return
 
         gray = to_grayscale(self.original_image)
-        self.current_image = floyd_steinberg_dithering(gray)
+        # Use ordered dithering for speed in programmatic operations
+        self.current_image = dither_image(gray, method='ordered')
         self.ui.update_processed(self.current_image)
 
 

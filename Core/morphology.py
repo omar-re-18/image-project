@@ -96,35 +96,3 @@ def morphological_gradient(img, kernel_size=3):
     result = dilated.astype(np.int16) - eroded.astype(np.int16)
 
     return np.clip(result, 0, 255).astype(np.uint8)
-
-
-# ==========================================
-# 6. Top Hat Transformation
-# ==========================================
-
-def top_hat(img, kernel_size=3):
-    """
-    Extracts small bright objects
-    """
-
-    opened = opening(img, kernel_size)
-
-    result = img.astype(np.int16) - opened.astype(np.int16)
-
-    return np.clip(result, 0, 255).astype(np.uint8)
-
-
-# ==========================================
-# 7. Black Hat Transformation
-# ==========================================
-
-def black_hat(img, kernel_size=3):
-    """
-    Extracts small dark objects
-    """
-
-    closed = closing(img, kernel_size)
-
-    result = closed.astype(np.int16) - img.astype(np.int16)
-
-    return np.clip(result, 0, 255).astype(np.uint8)

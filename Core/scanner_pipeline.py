@@ -2,7 +2,7 @@ import numpy as np
 
 # Import our manual modules
 from .preprocessing import to_grayscale, remove_noise, normalize
-from .enhancement import contrast_stretch, gamma_correction
+from .enhancement import contrast_stretch
 from .morphology import erosion, dilation, closing
 
 

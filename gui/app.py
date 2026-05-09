@@ -20,7 +20,7 @@ from core.morphology import opening, closing
 
 from tools.negative import negative
 from tools.solarization import solarize
-from tools.dithering import floyd_steinberg_dithering
+from tools.dithering import dither_image
 from tools.rgb_channels import channel_grid
 
 # ==========================================
@@ -532,20 +532,31 @@ class SmartScannerApp(ctk.CTk):
             messagebox.showwarning("Warning", "Please upload an image first")
             return
 
-        try:
-            gray = to_grayscale(
-                self.original_image
-            )
+        # Ask user to choose dithering method
+        choice = messagebox.askquestion(
+            "Dithering Method",
+            "Choose dithering method:\n\n" +
+            "Yes = Floyd-Steinberg (High Quality, Slower)\n" +
+            "No = Ordered Dithering (Fast, Good Quality)\n\n" +
+            "Floyd-Steinberg: 252x slower but better quality\n" +
+            "Ordered: Much faster with good visual results"
+        )
 
-            self.current_image = floyd_steinberg_dithering(gray)
+        method = 'floyd_steinberg' if choice == 'yes' else 'ordered'
+
+        try:
+            gray = to_grayscale(self.original_image)
+
+            self.current_image = dither_image(gray, method=method)
 
             self.display_image(
                 self.current_image,
                 self.processed_label
             )
 
+            method_name = "Floyd-Steinberg" if method == 'floyd_steinberg' else "Ordered"
             self.update_status(
-                "Dithering completed"
+                f"{method_name} dithering completed"
             )
         except Exception as e:
             messagebox.showerror("Error", str(e))
